@@ -6,6 +6,63 @@
     <title>VENECIA - Consola Suprema Ganadera</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+      // Credenciales oficiales de tu consola Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyDq1xLplHRKYjB7GqW40-jvVjAUcWub8gQ",
+        authDomain: "venecia-67ca0.firebaseapp.com",
+        projectId: "venecia-67ca0",
+        storageBucket: "venecia-67ca0.firebasestorage.app",
+        messagingSenderId: "602400151670",
+        appId: "1:602400151670:web:9045d45975ba56aa9f2757",
+        measurementId: "G-47L98HSTVG"
+      };
+
+      // Inicializar conexión
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+    </script>
+
+    <script>
+      // Funciones globales para tus botones GUARDAR y BUSCAR
+      function guardarTablaEnNube() {
+          const pesoTotal = parseFloat(document.getElementById('pesoTotal')?.innerText) || 0;
+          const promedio = parseFloat(document.getElementById('promedio')?.innerText) || 0;
+          const precioTotal = parseFloat(document.getElementById('precioTotal')?.innerText) || 0;
+
+          db.collection("pesajes").doc("tabla_actual").set({
+              pesoTotal: pesoTotal,
+              promedio: promedio,
+              precioTotal: precioTotal,
+              fechaActualizacion: new Date().toLocaleString()
+          })
+          .then(() => {
+              alert("¡Pesaje guardado en la nube! Ya puedes abrir este mismo enlace en otro dispositivo para consultarlo.");
+          })
+          .catch((error) => {
+              alert("Error de conexión: " + error.message);
+          });
+      }
+
+      function buscarTablaEnNube() {
+          db.collection("pesajes").doc("tabla_actual").get().then((doc) => {
+              if (doc.exists) {
+                  const datos = doc.data();
+                  if(document.getElementById('pesoTotal')) document.getElementById('pesoTotal').innerText = datos.pesoTotal;
+                  if(document.getElementById('promedio')) document.getElementById('promedio').innerText = datos.promedio;
+                  if(document.getElementById('precioTotal')) document.getElementById('precioTotal').innerText = datos.precioTotal;
+                  alert("Datos sincronizados desde la nube. Último registro: " + datos.fechaActualizacion);
+              } else {
+                  alert("No se encontraron registros previos en la nube.");
+              }
+          }).catch((error) => {
+              console.error("Error al recuperar:", error);
+          });
+      }
+    </script>
         :root {
             --bg-main: #ffffff;
             --border-color: #cccccc;
