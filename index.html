@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VENECIA - Consola Suprema Ganadera</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #ffffff;
+            --border-color: #cccccc;
+            --text-dark: #111111;
+            --text-muted: #555555;
+            --accent-corporate: #111827;
+            --accent-button: #2563eb;
+            --bg-light: #f8fafc;
+            --excel-green: #e2efda;
+            --excel-border: #a6a6a6;
+            --color-good: #16a34a;
+            --color-bad: #dc2626;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; border-radius: 0 !important; }
+        body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background-color: var(--bg-main); color: var(--text-dark); }
+
+        /* BARRA SUPERIOR */
+        .top-bar { height: 60px; background-color: var(--accent-corporate); color: #ffffff; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 2px solid var(--border-color); z-index: 10; }
+        .brand-section { display: flex; align-items: center; gap: 15px; }
+        .menu-toggle { background: none; border: none; color: white; font-size: 24px; cursor: pointer; width: 40px; height: 40px; }
+        .company-name { font-size: 22px; font-weight: bold; letter-spacing: 2px; }
+        .btn-top { padding: 8px 16px; background-color: #374151; color: white; border: 1px solid #4b5563; font-size: 12px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .btn-top:hover { background-color: var(--accent-button); }
+
+        /* AREA DE TRABAJO */
+        .workspace { display: flex; flex: 1; height: calc(100vh - 60px); position: relative; }
+        .sidebar { position: absolute; top: 0; left: -260px; width: 260px; height: 100%; background-color: var(--accent-corporate); color: white; z-index: 15; display: flex; flex-direction: column; padding: 15px 0; transition: left 0.3s ease; border-right: 1px solid var(--border-color); overflow-y: auto; }
+        .sidebar.open { left: 0; }
+        .sidebar-section-title { font-size: 11px; color: #94a3b8; text-transform: uppercase; padding: 10px 20px 5px 20px; font-weight: bold; letter-spacing: 1px; }
+        .menu-item { padding: 12px 20px; font-size: 13px; color: #cbd5e1; cursor: pointer; border: none; background: none; width: 100%; text-align: left; border-left: 4px solid transparent; }
+        .menu-item:hover, .menu-item.active { background-color: #1f2937; color: #ffffff; border-left-color: var(--accent-button); font-weight: bold; }
+
+        .main-content { flex: 1; padding: 24px; overflow-y: auto; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        .section-header { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .section-title { font-size: 16px; font-weight: bold; text-transform: uppercase; }
+
+        /* MULTI-COLUMNAS EXCEL */
+        .excel-block-container { display: flex; gap: 20px; background: #ffffff; border: 1px solid var(--border-color); padding: 15px; margin-bottom: 30px; align-items: flex-start; }
+        .excel-left-table { flex: 3; overflow-x: auto; }
+        .excel-right-kpis { flex: 1; min-width: 290px; background: #c6e0b4; border: 1px solid var(--excel-border); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        
+        .table-excel-format { border-collapse: collapse; width: 100%; background: #ffffff; }
+        .table-excel-format th { background: #a9d08e; color: black; border: 1px solid var(--excel-border); font-size: 11px; padding: 6px; text-transform: uppercase; text-align: center; }
+        .table-excel-format td { border: 1px solid var(--excel-border); padding: 4px; font-size: 12px; vertical-align: middle; }
+        
+        .cell-input-group { display: flex; align-items: center; gap: 4px; background: transparent; }
+        .cell-input-group input { width: 100%; border: none; background: transparent; padding: 4px; font-size: 12px; }
+        .cell-input-group input:focus { background: white; outline: none; }
+        .btn-info-trigger { background: #374151; color: white; border: none; padding: 2px 5px; font-size: 10px; cursor: pointer; font-weight: bold; }
+        
+        .row-total-excel { background: #e2efda; font-weight: bold; }
+        .kpi-row-excel { display: flex; justify-content: space-between; background: #e2efda; border: 1px solid var(--excel-border); padding: 6px 10px; font-size: 12px; font-weight: bold; align-items: center; }
+        .kpi-row-excel input { width: 45%; text-align: right; padding: 2px; border: 1px solid var(--excel-border); background: #fff; font-weight: bold; }
+
+        /* ANATOMIA */
+        .vaca-container { display: flex; flex-direction: column; align-items: center; background: var(--bg-light); padding: 15px; border: 1px solid var(--border-color); margin-bottom: 15px; }
+        .vaca-svg { width: 250px; height: 150px; }
+        .vaca-part { fill: #cbd5e1; stroke: #ffffff; stroke-width: 2; cursor: pointer; transition: fill 0.2s; }
+        .vaca-part.active-injury { fill: var(--color-bad) !important; }
+
+        /* MODAL INTERNO */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
+        .modal-box { background: white; border: 2px solid var(--accent-corporate); width: 450px; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .modal-box h3 { font-size: 14px; text-transform: uppercase; border-bottom: 2px solid var(--accent-corporate); padding-bottom: 5px; }
+        .modal-group { display: flex; flex-direction: column; gap: 5px; }
+        .modal-group label { font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .modal-group input, .modal-group select { padding: 6px; border: 1px solid var(--border-color); font-size: 13px; background: white; }
+
+        /* CONSOLAS DE CONSULTAS */
+        .search-panel { display: flex; flex-direction: column; gap: 15px; background: var(--bg-light); padding: 15px; border: 1px solid var(--border-color); margin-bottom: 20px; }
+        .search-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        .search-group { display: flex; flex-direction: column; gap: 5px; }
+        .search-group label { font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .search-group input, .search-group select { padding: 8px; border: 1px solid var(--border-color); font-size: 13px; background: white; }
+        .btn-search { padding: 10px; background-color: var(--accent-corporate); color: white; font-size: 12px; font-weight: bold; border: none; cursor: pointer; text-transform: uppercase; width: 100%; text-align: center; }
+        
+        .table-results { width: 100%; margin-top: 15px; border-collapse: collapse; }
+        .table-results th { background-color: var(--accent-corporate); color: white; padding: 8px; font-size: 12px; text-align: left; border: 1px solid var(--border-color); }
+        .table-results td { padding: 8px; border: 1px solid var(--border-color); font-size: 13px; }
+        .row-clicable { cursor: pointer; }
+        .row-clicable:hover { background-color: #f1f5f9; }
+        .btn-action-table { padding: 4px 8px; font-size: 11px; font-weight: bold; cursor: pointer; border: 1px solid var(--border-color); background: white; }
+        .btn-delete { color: var(--color-bad); border-color: var(--color-bad); }
+
+        /* REGISTRO CIVIL ESTILO DOCUMENTO */
+        .documento-civil-oficial { background: #ffffff; border: 3px double var(--accent-corporate); padding: 40px; margin-top: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .doc-header-escudo { text-align: center; border-bottom: 2px solid var(--accent-corporate); padding-bottom: 15px; margin-bottom: 20px; }
+        .doc-header-escudo h2 { font-size: 20px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; }
+        .doc-header-escudo p { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; }
+        .doc-grid-campos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+        .doc-campo { display: flex; flex-direction: column; border-bottom: 1px dashed var(--excel-border); padding-bottom: 4px; }
+        .doc-campo label { font-size: 9px; font-weight: bold; color: #475569; text-transform: uppercase; margin-bottom: 2px; }
+        .doc-campo input, .doc-campo select { border: none; background: transparent; font-size: 13px; font-weight: bold; color: #0f172a; outline: none; }
+        .doc-campo input:focus { background: #f8fafc; }
+
+        .scrollable-table-container { width: 100%; overflow-x: auto; border: 1px solid var(--border-color); background: white; margin-bottom: 15px; }
+        .scrollable-table-container table { min-width: 2400px; border-collapse: collapse; }
+        .scrollable-table-container th { background: var(--accent-corporate); color: white; padding: 8px; font-size: 12px; text-transform: uppercase; border: 1px solid var(--border-color); }
+        .scrollable-table-container td { padding: 4px; border: 1px solid var(--border-color); }
+        .scrollable-table-container input, .scrollable-table-container select { width: 100%; padding: 4px; border: none; background: transparent; font-size: 12px; }
+        .btn-action-add { margin-top: 5px; padding: 8px 16px; background-color: #ffffff; border: 1px solid var(--border-color); cursor: pointer; font-size: 12px; font-weight: bold; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA SUPERIOR -->
+    <div class="top-bar">
+        <div class="brand-section">
+            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            <div class="company-name">VENECIA</div>
+            <span style="font-size:12px; color:#94a3b8;">Sistema Integrado de Control Ganadero</span>
+        </div>
+        <div>
+            <button class="btn-top" style="background-color: #059669; border-color: #059669;" onclick="sincronizarYGuardarTodo()">Guardar Cambios Pagina</button>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <!-- MENU LATERAL -->
+        <div class="sidebar" id="sidebarMenu">
+            <button class="menu-item active" onclick="switchView('inicio')">Inicio / Dashboard</button>
+            <div class="sidebar-section-title">Ingreso de Datos</div>
+            <button class="menu-item" onclick="switchView('ingreso-unidad')">Datos de Unidad</button>
+            <button class="menu-item" onclick="switchView('ingreso-reparticion')">Tablas de Pesaje y Control</button>
+            <button class="menu-item" onclick="switchView('ingreso-vacunacion')">Datos de Vacunación</button>
+            <button class="menu-item" onclick="switchView('ingreso-ordenio')">Control de Ordeño y Cría</button>
+            <div class="sidebar-section-title">Modos de Búsqueda Avanzada</div>
+            <button class="menu-item" onclick="switchView('busqueda-unidad')">Búsqueda Unidades</button>
+            <button class="menu-item" onclick="switchView('busqueda-reparticion')">Búsqueda Operativa Gral.</button>
+            <button class="menu-item" onclick="switchView('busqueda-vacunacion')">Búsqueda Vacunas</button>
+            <button class="menu-item" onclick="switchView('busqueda-ordenio')">Búsqueda Ficha Civil Bovino</button>
+        </div>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <div class="main-content">
+            
+            <!-- INICIO -->
+            <div id="view-inicio" class="view-section active">
+                <div style="background: #111827; color: white; padding: 40px; border: 1px solid var(--border-color); margin-bottom: 25px;">
+                    <h1 style="font-size: 42px; font-weight: 900; letter-spacing: 4px;">VENECIA</h1>
+                    <p style="color:#94a3b8; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Consola de Inteligencia y Liquidación de Ganado</p>
+                </div>
+            </div>
+
+            <!-- REGISTRO UNIDAD -->
+            <div id="view-ingreso-unidad" class="view-section">
+                <div class="section-header"><h2 class="section-title">Registro Técnico de la Unidad Animal</h2></div>
+                <div class="excel-container">
+                    <table class="table-excel-format">
+                        <thead>
+                            <tr><th>Número Unidad</th><th>Nombre de Unidad</th><th>Propietario</th><th>Registro (ICA)</th><th>Enfermedad / Diagnóstico</th><th>Fecha Registro</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><input type="text" id="unit-num" placeholder="Ej. 001"></td>
+                                <td><input type="text" id="unit-name" placeholder="Ej. Mariposa"></td>
+                                <td><input type="text" id="unit-owner" placeholder="Nombre dueño"></td>
+                                <td><input type="text" id="unit-ica" placeholder="Registro"></td>
+                                <td><input type="text" id="unit-disease" placeholder="Patología"></td>
+                                <td><input type="date" id="unit-date"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="vaca-container" style="margin-top:15px;">
+                    <svg class="vaca-svg" viewBox="0 0 200 120">
+                        <rect class="vaca-part" id="part-Cabeza" data-part="Cabeza" x="140" y="20" width="35" height="30" onclick="marcarZonaMapa(this)"/>
+                        <rect class="vaca-part" id="part-Cuerpo" data-part="Cuerpo" x="50" y="35" width="90" height="50" onclick="marcarZonaMapa(this)"/>
+                        <rect class="vaca-part" id="part-PataDelanteraIzq" data-part="Pata Delantera Izq" x="115" y="85" width="10" height="25" onclick="marcarZonaMapa(this)"/>
+                        <rect class="vaca-part" id="part-PataDelanteraDer" data-part="Pata Delantera Der" x="128" y="85" width="10" height="25" onclick="marcarZonaMapa(this)"/>
+                        <rect class="vaca-part" id="part-PataTraseraIzq" data-part="Pata Trasera Izq" x="55" y="85" width="10" height="25" onclick="marcarZonaMapa(this)"/>
+                        <rect class="vaca-part" id="part-PataTraseraDer" data-part="Pata Trasera Der" x="68" y="85" width="10" height="25" onclick="marcarZonaMapa(this)"/>
+                    </svg>
+                </div>
+                <div class="excel-container">
+                    <table class="table-excel-format"><thead><tr><th>Descripción de Zona de Anatomía</th></tr></thead><tbody><tr><td><input type="text" id="unit-obs-lugar" placeholder="Zonas seleccionadas..."></td></tr></tbody></table>
+                </div>
+                <div class="excel-container">
+                    <table class="table-excel-format"><thead><tr><th>Descripción General Complementaria</th></tr></thead><tbody><tr><td><input type="text" id="unit-obs-general" placeholder="Notas..."></td></tr></tbody></table>
+                </div>
+            </div>
+
+            <!-- REGISTRO PESAJES / REPARTICIÓN -->
+            <div id="view-ingreso-reparticion" class="view-section">
+                <div class="section-header">
+                    <h2 class="section-title">Estructura Dinámica de Tablas Operativas</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="selectorFormatoTabla" style="padding: 6px; font-size: 12px; font-weight: bold;">
+                            <option value="particion">Partición (Diseño Excel Compacto)</option>
+                        </select>
+                        <button class="btn-top" onclick="crearNuevaTablaSegunFormato()">[+] Crear Nueva Tabla</button>
+                    </div>
+                </div>
+                <div id="contenedorDinamicoTablasExcel"></div>
+            </div>
+
+            <!-- REGISTRO VACUNACION -->
+            <div id="view-ingreso-vacunacion" class="view-section">
+                <div class="section-header">
+                    <h2 class="section-title">Control de Tablas de Vacunación Médico</h2>
+                    <button class="btn-top" onclick="crearNuevaTablaVacunacionBlock()">[+] Añadir Nueva Tabla</button>
+                </div>
+                <div id="contenedorVacunacionMultiBlocks"></div>
+            </div>
+
+            <!-- REGISTRO MATRIZ ORDEÑO -->
+            <div id="view-ingreso-ordenio" class="view-section">
+                <div class="section-header">
+                    <h2 class="section-title">Matriz General de Ordeño y Natalidad</h2>
+                    <button class="btn-top" style="background-color: var(--accent-button);" onclick="exportarTablaExcelDirecta('tablaOrdenioMaster', 'Control_Ordenio')">Exportar Matriz Excel</button>
+                </div>
+                <div class="scrollable-table-container">
+                    <table id="tablaOrdenioMaster">
+                        <thead>
+                            <tr>
+                                <th>ID Unidad</th><th>Hierro</th><th>Nombre Animal</th><th>Sexo</th><th>Lugar Nacimiento</th><th>Corregimiento</th><th>Municipio</th><th>Estado</th><th>Nombre Madre</th><th>ID Madre</th><th>N° Madre</th><th>N° Partos</th><th>Padre Ternero</th><th>N° Terneros</th><th>N° Padre</th><th>Procedencia</th><th>Fecha</th><th>Litros Diarios</th><th>Notas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyOrdenioRows"></tbody>
+                    </table>
+                </div>
+                <button class="btn-action-add" onclick="agregarFilaAOrdenio()">[+] Añadir Fila de Production</button>
+            </div>
+
+            <!-- BUSQUEDA DE UNIDADES CON FILTRO DE FECHAS -->
+            <div id="view-busqueda-unidad" class="view-section">
+                <div class="section-header"><h2 class="section-title">Búsqueda Total de Unidades Individuales</h2></div>
+                <div class="search-panel">
+                    <div class="search-grid">
+                        <div class="search-group"><label>Número Unidad / ID</label><input type="text" id="s-uni-id"></div>
+                        <div class="search-group"><label>Nombre Unidad</label><input type="text" id="s-uni-name"></div>
+                        <div class="search-group"><label>Desde Fecha</label><input type="date" id="s-uni-date-start"></div>
+                        <div class="search-group"><label>Hasta Fecha</label><input type="date" id="s-uni-date-end"></div>
+                    </div>
+                    <button class="btn-search" onclick="filtrarBusquedaUnidadMaster()">Ejecutar Consulta</button>
+                </div>
+                <div style="display:flex; gap:20px;">
+                    <div style="flex:1;" id="resultBusquedaUnidad"></div>
+                    <div style="flex:1; display:none;" id="fichaDetalleUnidadCompleta"></div>
+                </div>
+            </div>
+
+            <!-- CONSOLA OPERATIVA HISTORIAL DE PESAJES CON FILTRO DE FECHAS -->
+            <div id="view-busqueda-reparticion" class="view-section">
+                <div class="section-header"><h2 class="section-title">Consola Histórica de Registros Generales (Pesajes)</h2></div>
+                <div class="search-panel">
+                    <div class="search-grid">
+                        <div class="search-group"><label>Nombre de la Tabla</label><input type="text" id="s-rep-tablename" placeholder="Ej. Lote 1"></div>
+                        <div class="search-group"><label>Desde Fecha</label><input type="date" id="s-rep-date-start"></div>
+                        <div class="search-group"><label>Hasta Fecha</label><input type="date" id="s-rep-date-end"></div>
+                    </div>
+                    <button class="btn-search" onclick="filtrarBusquedaAvanzadaMaster()">Listar Tablas Guardadas</button>
+                </div>
+                <div id="resultBusquedaReparticion"></div>
+                <div id="espacioEdicionTablaReconstruida" style="margin-top:20px;"></div>
+            </div>
+
+            <!-- BUSQUEDA CLINICA DE VACUNAS CON FILTRO DE FECHAS -->
+            <div id="view-busqueda-vacunacion" class="view-section">
+                <div class="section-header"><h2 class="section-title">Búsqueda de Control Clínico de Vacunas</h2></div>
+                <div class="search-panel">
+                    <div class="search-grid">
+                        <div class="search-group"><label>ID Unidad</label><input type="text" id="s-vac-id"></div>
+                        <div class="search-group"><label>Desde Fecha</label><input type="date" id="s-vac-date-start"></div>
+                        <div class="search-group"><label>Hasta Fecha</label><input type="date" id="s-vac-date-end"></div>
+                    </div>
+                    <button class="btn-search" onclick="filtrarBusquedaVacunaMaster()">Consultar Registro</button>
+                </div>
+                <div id="resultBusquedaVacuna"></div>
+            </div>
+
+            <!-- CONSULTA Y GENERADOR DE FICHA CIVIL CON FILTRO DE FECHAS -->
+            <div id="view-busqueda-ordenio" class="view-section">
+                <div class="section-header"><h2 class="section-title">Consola de Documentos y Ficha Civil Bovino</h2></div>
+                <div class="search-panel">
+                    <div class="search-grid">
+                        <div class="search-group"><label>N° Identificación / ID</label><input type="text" id="s-ord-id-search"></div>
+                        <div class="search-group"><label>Desde Fecha Alta</label><input type="date" id="s-ord-date-start"></div>
+                        <div class="search-group"><label>Hasta Fecha Alta</label><input type="date" id="s-ord-date-end"></div>
+                    </div>
+                    <button class="btn-search" style="background-color: var(--accent-button);" onclick="buscarFichaRegistroCivilOrdeño()">Consultar Registro</button>
+                </div>
+                <div id="contenedorFichaRegistroCivil"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL INFORMATIVO DE CELDAS EXCEL (ⓘ) -->
+    <div class="modal-overlay" id="modalDetalleUnidad">
+        <div class="modal-box">
+            <h3 id="modalTitleID">Detalle de la Unidad Animal</h3>
+            <div class="modal-group"><label>Nombre Propietario / Dueño</label><input type="text" id="m-owner"></div>
+            <div class="modal-group"><label>Estado / Condición</label><select id="m-status"><option value="Bueno">Bueno</option><option value="Malo">Malo</option></select></div>
+            <div class="modal-group"><label>Observaciones</label><input type="text" id="m-desc"></div>
+            <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="btn-top" style="background:#6b7280;" onclick="cerrarVentanaDetalles()">Cancelar</button>
+                <button class="btn-top" style="background:#2563eb;" onclick="guardarCambiosVentanaDetalles()">Aplicar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ECO-SISTEMA CENTRAL DE BASES DE DATOS VIRTUALES CON PERSISTENCIA INTEGRAL
+        let BASE_DATOS_VIRTUAL = { 
+            unidades: [], 
+            tablasPesaje: {}, 
+            vacunaciones: [], 
+            ordeños: [] 
+        };
+        
+        let numTablasCreadas = 0, numBlocksVacunacion = 0, listadoZonasAfectadas = [], celdaActivaEdicion = null;
+
+        // Establecer fecha actual por defecto en el campo de ingreso de Unidad
+        document.getElementById('unit-date').value = new Date().toISOString().split('T')[0];
+
+        function toggleSidebar() { document.getElementById('sidebarMenu').classList.toggle('open'); }
+        
+        function switchView(id) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+            document.getElementById(`view-${id}`).classList.add('active');
+            const btn = Array.from(document.querySelectorAll('.menu-item')).find(b => b.getAttribute('onclick').includes(id));
+            if(btn) btn.classList.add('active');
+        }
+
+        function marcarZonaMapa(el) {
+            el.classList.toggle('active-injury');
+            let zona = el.getAttribute('data-part');
+            if(el.classList.contains('active-injury')) listadoZonasAfectadas.push(zona);
+            else listadoZonasAfectadas = listadoZonasAfectadas.filter(z => z !== zona);
+            document.getElementById('unit-obs-lugar').value = listadoZonasAfectadas.join(', ');
+        }
+
+        // GENERADORES DINAMICOS DE LA TABLA OPERATIVA EXCEL
+        function crearNuevaTablaSegunFormato() {
+            numTablasCreadas++;
+            const container = document.getElementById('contenedorDinamicoTablasExcel');
+            const wrapper = document.createElement('div');
+            wrapper.className = 'excel-block-container';
+            wrapper.id = `tabla-wrapper-id-${numTablasCreadas}`;
+            let today = new Date().toISOString().split('T')[0];
+
+            wrapper.innerHTML = `
+                <div class="excel-left-table">
+                    <div style="background:#e2efda; padding:8px; border:1px solid var(--excel-border); font-weight:bold; font-size:12px; margin-bottom:5px; display:flex; gap:15px;">
+                        <span>TABLA: <input type="text" class="t-meta-name" value="Lote-${numTablasCreadas}" style="font-weight:bold; width:150px;"></span>
+                        <span>Fecha: <input type="date" class="t-meta-date" value="${today}"></span>
+                    </div>
+                    <table class="table-excel-format" id="grid-valores-${numTablasCreadas}">
+                        <thead><tr><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th></tr></thead>
+                        <tbody class="tbody-particion-excel" id="tbody-particion-excel-${numTablasCreadas}"></tbody>
+                        <tfoot>
+                            <tr class="row-total-excel">
+                                <td>TOTAL</td><td id="tot-col1-${numTablasCreadas}">0</td><td>TOTAL</td><td id="tot-col2-${numTablasCreadas}">0</td>
+                                <td>TOTAL</td><td id="tot-col3-${numTablasCreadas}">0</td><td>TOTAL</td><td id="tot-col4-${numTablasCreadas}">0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <button class="btn-action-add" onclick="agregarFilaCompactaAParticion(${numTablasCreadas})">[+] Añadir Unidad de Pesaje</button>
+                </div>
+                <div class="excel-right-kpis">
+                    <strong>KPI CONTROL EXCEL</strong>
+                    <div class="kpi-row-excel"><span>PROMEDIO</span><span id="kpi-prom-${numTablasCreadas}">0,00</span></div>
+                    <div class="kpi-row-excel"><span>TOTAL PESO kg</span><span id="kpi-peso-${numTablasCreadas}">0</span></div>
+                    <div class="kpi-row-excel"><span>CABEZAS</span><span id="kpi-cabezas-${numTablasCreadas}">0</span></div>
+                    <div class="kpi-row-excel"><span>PRECIO KG</span><input type="number" id="kpi-input-precio-${numTablasCreadas}" value="8500" oninput="recalcularTotalesExcel(${numTablasCreadas})"></div>
+                    <div class="kpi-row-excel" style="background:#a9d08e;"><span>VALOR NETO</span><span id="kpi-total-cop-${numTablasCreadas}">$ 0</span></div>
+                </div>`;
+            container.appendChild(wrapper);
+            agregarFilaCompactaAParticion(numTablasCreadas);
+        }
+
+        function agregarFilaCompactaAParticion(idxTabla) {
+            const tbody = document.getElementById(`tbody-particion-excel-${idxTabla}`);
+            let totalCeldasActuales = tbody.querySelectorAll('.p-weight').length;
+            let proximoId = totalCeldasActuales + 1;
+
+            let lastRow = tbody.lastElementChild;
+            if (!lastRow || lastRow.querySelectorAll('.p-weight').length >= 4) {
+                lastRow = document.createElement('tr');
+                tbody.appendChild(lastRow);
+            }
+
+            lastRow.innerHTML += `
+                <td style="background:#f2f2f2; text-align:center; font-weight:bold; width:5%;">${proximoId}</td>
+                <td style="width:20%;">
+                    <div class="cell-input-group">
+                        <input type="number" class="p-weight" data-id="${proximoId}" placeholder="0" oninput="recalcularTotalesExcel(${idxTabla})">
+                        <button class="btn-info-trigger" onclick="abrirVentanaFlotanteDetalles(this.previousElementSibling, '${proximoId}')">ⓘ</button>
+                    </div>
+                </td>`;
+            reajustarEstructuraCeldasFantasma(lastRow);
+        }
+
+        function reajustarEstructuraCeldasFantasma(row) {
+            row.querySelectorAll('.ghost-cell').forEach(c => c.remove());
+            let cantInputs = row.querySelectorAll('.p-weight').length;
+            if (cantInputs > 0 && cantInputs < 4) {
+                let faltantes = 4 - cantInputs;
+                for(let i=0; i<faltantes; i++) {
+                    row.innerHTML += `<td class="ghost-cell" style="background:#fafafa;">-</td><td class="ghost-cell" style="background:#fafafa;"></td>`;
+                }
+            }
+        }
+
+        function recalcularTotalesExcel(idx) {
+            const table = document.getElementById(`grid-valores-${idx}`);
+            let inputs = table.querySelectorAll('.p-weight');
+            let pesoTotalGeneral = 0, totalCabezas = 0;
+            let colTotals = [0, 0, 0, 0];
+
+            inputs.forEach((input, index) => {
+                let p = parseFloat(input.value) || 0;
+                if(p > 0) totalCabezas++;
+                pesoTotalGeneral += p;
+                colTotals[Math.floor(index % 4)] += p;
+            });
+
+            for(let i=0; i<4; i++) {
+                if(document.getElementById(`tot-col${i+1}-${idx}`)) document.getElementById(`tot-col${i+1}-${idx}`).innerText = colTotals[i];
+            }
+
+            let promedioGeneral = totalCabezas > 0 ? (pesoTotalGeneral / totalCabezas) : 0;
+            document.getElementById(`kpi-prom-${idx}`).innerText = promedioGeneral.toFixed(2);
+            document.getElementById(`kpi-peso-${idx}`).innerText = pesoTotalGeneral;
+            document.getElementById(`kpi-cabezas-${idx}`).innerText = totalCabezas;
+            let precioKg = parseFloat(document.getElementById(`kpi-input-precio-${idx}`).value) || 0;
+            document.getElementById(`kpi-total-cop-${idx}`).innerText = `$ ${(pesoTotalGeneral * precioKg).toLocaleString('es-CO')}`;
+        }
+
+        function abrirVentanaFlotanteDetalles(inputEl, animalID) {
+            celdaActivaEdicion = inputEl;
+            document.getElementById('modalTitleID').innerText = `Detalle Unidad N°/ID: ${animalID}`;
+            document.getElementById('m-owner').value = inputEl.getAttribute('data-owner') || "";
+            document.getElementById('m-status').value = inputEl.getAttribute('data-status') || "Bueno";
+            document.getElementById('m-desc').value = inputEl.getAttribute('data-desc') || "";
+            document.getElementById('modalDetalleUnidad').style.display = 'flex';
+        }
+
+        function cerrarVentanaDetalles() { document.getElementById('modalDetalleUnidad').style.display = 'none'; }
+        function guardarCambiosVentanaDetalles() {
+            if(celdaActivaEdicion) {
+                celdaActivaEdicion.setAttribute('data-owner', document.getElementById('m-owner').value);
+                celdaActivaEdicion.setAttribute('data-status', document.getElementById('m-status').value);
+                celdaActivaEdicion.setAttribute('data-desc', document.getElementById('m-desc').value);
+                celdaActivaEdicion.style.backgroundColor = "#e2efda";
+            }
+            cerrarVentanaDetalles();
+        }
+
+        function crearNuevaTablaVacunacionBlock() {
+            numBlocksVacunacion++;
+            const div = document.createElement('div');
+            div.className = 'excel-container'; div.id = `block-vac-id-${numBlocksVacunacion}`;
+            div.innerHTML = `
+                <div style="background:#111827; color:white; padding:8px; display:flex; gap:10px;">
+                    <input type="text" class="meta-vac-owner" value="Plan Sanitario General" style="width:40%;">
+                    <input type="date" class="meta-vac-date" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <table class="table-excel-format">
+                    <thead><tr><th>N° Vaca</th><th>Nombre Propietario</th><th>¿Vacunado?</th><th>Fecha Aplicación</th></tr></thead>
+                    <tbody class="tbody-vacunacion-rows"></tbody>
+                </table>
+                <button class="btn-action-add" onclick="agregarFilaAVacBlock(${numBlocksVacunacion})">[+] Registro Médico</button>`;
+            document.getElementById('contenedorVacunacionMultiBlocks').appendChild(div);
+            agregarFilaAVacBlock(numBlocksVacunacion);
+        }
+
+        function agregarFilaAVacBlock(id) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><input type="text" class="cell-vac-id" placeholder="ID Vaca"></td><td><input type="text" class="cell-vac-owner" placeholder="Dueño"></td><td><select class="cell-vac-indicator"><option value="Sí">Sí</option><option value="No">No</option></select></td><td><input type="date" class="cell-vac-date" value="${new Date().toISOString().split('T')[0]}"></td>`;
+            document.querySelector(`#block-vac-id-${id} .tbody-vacunacion-rows`).appendChild(tr);
+        }
+
+        function agregarFilaAOrdenio() {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="ord-id" placeholder="ID"></td><td><input type="text" class="ord-hierro" placeholder="Hierro"></td><td><input type="text" class="ord-nombre" placeholder="Nombre"></td><td><select class="ord-sexo"><option value="Hembra">Hembra</option><option value="Macho">Macho</option></select></td><td><input type="text" class="ord-lugarnac" placeholder="Lugar"></td><td><input type="text" class="ord-correg" placeholder="Corregimiento"></td><td><input type="text" class="ord-mun" placeholder="Municipio"></td><td><select class="ord-edad"><option value="Nuevo">Nuevo</option><option value="Viejo">Viejo</option></select></td><td><input type="text" class="ord-nom-madre" placeholder="Nombre Madre"></td><td><input type="text" class="ord-id-madre" placeholder="ID Madre"></td><td><input type="text" class="ord-num-madre" placeholder="N° Madre"></td><td><input type="number" class="ord-partos" value="0"></td><td><input type="text" class="ord-padre-ter" placeholder="Padre Ternero"></td><td><input type="number" class="ord-num-ter" value="0"></td><td><input type="text" class="ord-num-padre-ter" placeholder="N° Padre"></td><td><input type="text" class="ord-procedencia" placeholder="Procedencia"></td><td><input type="date" class="ord-fecha" value="${new Date().toISOString().split('T')[0]}"></td><td><input type="number" step="0.1" class="ord-litros" value="0.0"></td><td><input type="text" class="ord-notes" placeholder="Notas"></td>`;
+            document.getElementById('tbodyOrdenioRows').appendChild(tr);
+        }
+
+        // GUARDADO EN MEMORIA GLOBAL UNIFICADA
+        function sincronizarYGuardarTodo() {
+            let unitNum = document.getElementById('unit-num').value.trim();
+            if(unitNum) {
+                BASE_DATOS_VIRTUAL.unidades = BASE_DATOS_VIRTUAL.unidades.filter(x => x.id !== unitNum);
+                BASE_DATOS_VIRTUAL.unidades.push({
+                    id: unitNum, nombre: document.getElementById('unit-name').value, propietario: document.getElementById('unit-owner').value, ica: document.getElementById('unit-ica').value, diagnostico: document.getElementById('unit-disease').value, zonas: [...listadoZonasAfectadas], obs: document.getElementById('unit-obs-general').value, fecha: document.getElementById('unit-date').value
+                });
+            }
+
+            document.querySelectorAll('.excel-block-container').forEach(block => {
+                let nameT = block.querySelector('.t-meta-name')?.value || 'Lote';
+                let dateT = block.querySelector('.t-meta-date')?.value || '';
+                let listadoCeldas = [];
+                block.querySelectorAll('.p-weight').forEach(inp => {
+                    listadoCeldas.push({
+                        id: inp.getAttribute('data-id'), peso: inp.value, owner: inp.getAttribute('data-owner')||'', status: inp.getAttribute('data-status')||'Bueno', desc: inp.getAttribute('data-desc')||''
+                    });
+                });
+                BASE_DATOS_VIRTUAL.tablasPesaje[nameT] = { nombre: nameT, fecha: dateT, celdas: listadoCeldas };
+            });
+
+            BASE_DATOS_VIRTUAL.vacunaciones = [];
+            document.querySelectorAll('[id^="block-vac-id-"]').forEach(b => {
+                b.querySelectorAll('.tbody-vacunacion-rows tr').forEach(r => {
+                    let vid = r.querySelector('.cell-vac-id').value.trim();
+                    if(vid) {
+                        BASE_DATOS_VIRTUAL.vacunaciones.push({
+                            id: vid, propietario: r.querySelector('.cell-vac-owner').value, indicador: r.querySelector('.cell-vac-indicator').value, fecha: r.querySelector('.cell-vac-date').value
+                        });
+                    }
+                });
+            });
+
+            document.querySelectorAll('#tbodyOrdenioRows tr').forEach(tr => {
+                let id = tr.querySelector('.ord-id').value.trim();
+                if(id) {
+                    BASE_DATOS_VIRTUAL.ordeños = BASE_DATOS_VIRTUAL.ordeños.filter(x => x.id !== id);
+                    BASE_DATOS_VIRTUAL.ordeños.push({
+                        id: id, hierro: tr.querySelector('.ord-hierro').value, nombre: tr.querySelector('.ord-nombre').value, sexo: tr.querySelector('.ord-sexo').value, lugarnac: tr.querySelector('.ord-lugarnac').value, correg: tr.querySelector('.ord-correg').value, mun: tr.querySelector('.ord-mun').value, edad: tr.querySelector('.ord-edad').value, madre: tr.querySelector('.ord-nom-madre').value, idMadre: tr.querySelector('.ord-id-madre').value, numMadre: tr.querySelector('.ord-num-madre').value, partos: tr.querySelector('.ord-partos').value, padreTer: tr.querySelector('.ord-padre-ter').value, numTer: tr.querySelector('.ord-num-ter').value, numPadreTer: tr.querySelector('.ord-num-padre-ter').value, procedencia: tr.querySelector('.ord-procedencia').value, fecha: tr.querySelector('.ord-fecha').value, litros: tr.querySelector('.ord-litros').value, notas: tr.querySelector('.ord-notes').value
+                    });
+                }
+            });
+
+            alert('¡Cambios guardados con éxito en la consola de datos central!');
+        }
+
+        // VALIDACIÓN LOGICA DE RANGOS DE FECHAS
+        function evaluarRangoFecha(itemFecha, desde, hasta) {
+            if (!itemFecha) return false;
+            if (desde && itemFecha < desde) return false;
+            if (hasta && itemFecha > hasta) return false;
+            return true;
+        }
+
+        // SISTEMAS DE BUSQUEDAS CON FILTRADO CRONOLÓGICO
+        function filtrarBusquedaUnidadMaster() {
+            let fid = document.getElementById('s-uni-id').value.trim().toLowerCase();
+            let fname = document.getElementById('s-uni-name').value.trim().toLowerCase();
+            let desde = document.getElementById('s-uni-date-start').value;
+            let hasta = document.getElementById('s-uni-date-end').value;
+
+            let res = BASE_DATOS_VIRTUAL.unidades.filter(x => {
+                if (fid && !x.id.toLowerCase().includes(fid)) return false;
+                if (fname && !x.nombre.toLowerCase().includes(fname)) return false;
+                if (!evaluarRangoFecha(x.fecha, desde, hasta)) return false;
+                return true;
+            });
+
+            let html = `<table class="table-results"><thead><tr><th>ID Unidad</th><th>Nombre</th><th>Propietario</th><th>Fecha Reg.</th></tr></thead><tbody>`;
+            res.forEach(x => {
+                html += `<tr class="row-clicable" onclick="mostrarFichaGraficaUnidad('${x.id}')"><td><strong>${x.id}</strong></td><td>${x.nombre}</td><td>${x.propietario}</td><td>${x.fecha || '-'}</td></tr>`;
+            });
+            document.getElementById('resultBusquedaUnidad').innerHTML = html + "</tbody></table>";
+        }
+
+        function mostrarFichaGraficaUnidad(id) {
+            let u = BASE_DATOS_VIRTUAL.unidades.find(x => x.id === id);
+            if(!u) return;
+            let panel = document.getElementById('fichaDetalleUnidadCompleta');
+            panel.style.display = "block";
+            
+            let parts = ['Cabeza','Cuerpo','PataDelanteraIzq','PataDelanteraDer','PataTraseraIzq','PataTraseraDer'];
+            let svgPartes = '';
+            parts.forEach(p => {
+                let activeClass = u.zonas.includes(p.replace(/([A-Z])/g, ' $1').trim()) ? 'active-injury' : '';
+                if(p==='Cabeza') svgPartes += `<rect class="vaca-part ${activeClass}" x="140" y="20" width="35" height="30"/>`;
+                if(p==='Cuerpo') svgPartes += `<rect class="vaca-part ${activeClass}" x="50" y="35" width="90" height="50"/>`;
+                if(p==='PataDelanteraIzq') svgPartes += `<rect class="vaca-part ${activeClass}" x="115" y="85" width="10" height="25"/>`;
+                if(p==='PataDelanteraDer') svgPartes += `<rect class="vaca-part ${activeClass}" x="128" y="85" width="10" height="25"/>`;
+                if(p==='PataTraseraIzq') svgPartes += `<rect class="vaca-part ${activeClass}" x="55" y="85" width="10" height="25"/>`;
+                if(p==='PataTraseraDer') svgPartes += `<rect class="vaca-part ${activeClass}" x="68" y="85" width="10" height="25"/>`;
+            });
+
+            panel.innerHTML = `
+                <div style="border:2px solid var(--accent-corporate); padding:15px; background:white;">
+                    <h3 style="text-transform:uppercase; margin-bottom:10px;">Ficha Médica Visual - ID: ${u.id}</h3>
+                    <p><strong>Nombre:</strong> ${u.nombre}</p>
+                    <p><strong>Propietario:</strong> ${u.propietario}</p>
+                    <p><strong>Fecha Registro:</strong> ${u.fecha || '-'}</p>
+                    <p><strong>Registro ICA:</strong> ${u.ica}</p>
+                    <p><strong>Diagnóstico:</strong> ${u.diagnostico}</p>
+                    <div class="vaca-container" style="margin-top:10px;">
+                        <svg class="vaca-svg" viewBox="0 0 200 120">${svgPartes}</svg>
+                    </div>
+                    <p style="font-size:11px; color:var(--color-bad);"><strong>Áreas con Molestia:</strong> ${u.zonas.join(', ')}</p>
+                </div>`;
+        }
+
+        function filtrarBusquedaAvanzadaMaster() {
+            let fn = document.getElementById('s-rep-tablename').value.trim().toLowerCase();
+            let desde = document.getElementById('s-rep-date-start').value;
+            let hasta = document.getElementById('s-rep-date-end').value;
+
+            let html = `<table class="table-results"><thead><tr><th>Nombre de Tabla Guardada</th><th>Fecha de Registro</th><th>Acción</th></tr></thead><tbody>`;
+            
+            Object.keys(BASE_DATOS_VIRTUAL.tablasPesaje).forEach(key => {
+                let t = BASE_DATOS_VIRTUAL.tablasPesaje[key];
+                let cumpleNombre = !fn || t.nombre.toLowerCase().includes(fn);
+                let cumpleFecha = evaluarRangoFecha(t.fecha, desde, hasta);
+
+                if(cumpleNombre && cumpleFecha) {
+                    html += `<tr><td><strong>${t.nombre}</strong></td><td>${t.fecha}</td><td>
+                        <button class="btn-action-table" onclick="reconstruirYEditarTablaExcel('${t.nombre}')">Modificar / Ver Gráfica</button>
+                        <button class="btn-action-table btn-delete" onclick="eliminarTablaPesajeHistorial('${t.nombre}')">Eliminar</button>
+                    </td></tr>`;
+                }
+            });
+            document.getElementById('resultBusquedaReparticion').innerHTML = html + "</tbody></table>";
+        }
+
+        function eliminarTablaPesajeHistorial(name) {
+            delete BASE_DATOS_VIRTUAL.tablasPesaje[name];
+            filtrarBusquedaAvanzadaMaster();
+            document.getElementById('espacioEdicionTablaReconstruida').innerHTML = '';
+        }
+
+        function reconstruirYEditarTablaExcel(name) {
+            let t = BASE_DATOS_VIRTUAL.tablasPesaje[name];
+            let espacio = document.getElementById('espacioEdicionTablaReconstruida');
+            
+            espacio.innerHTML = `
+                <div class="excel-block-container" id="reconstruct-block" style="border:2px solid var(--accent-button);">
+                    <div class="excel-left-table">
+                        <div style="background:#cfe2ff; padding:8px; border:1px solid var(--excel-border); font-weight:bold; font-size:12px; margin-bottom:5px;">
+                            <span>MODIFICANDO HISTORIAL: <input type="text" id="rec-name" value="${t.nombre}" style="font-weight:bold;"></span>
+                            <span>Fecha: <input type="date" id="rec-date" value="${t.fecha}"></span>
+                        </div>
+                        <table class="table-excel-format" id="grid-valores-reconstruct">
+                            <thead><tr><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th></tr></thead>
+                            <tbody id="tbody-reconstruct"></tbody>
+                        </table>
+                        <button class="btn-top" style="background:var(--color-good); margin-top:10px;" onclick="guardarCambiosTablaReconstruida('${t.nombre}')">Guardar Modificaciones de Tabla</button>
+                    </div>
+                    <div class="excel-right-kpis" style="background:#cfe2ff;">
+                        <strong>KPI MODIFICACIÓN</strong>
+                        <div class="kpi-row-excel"><span>PROMEDIO</span><span id="kpi-prom-rec">0</span></div>
+                        <div class="kpi-row-excel"><span>TOTAL PESO kg</span><span id="kpi-peso-rec">0</span></div>
+                        <div class="kpi-row-excel"><span>CABEZAS</span><span id="kpi-cabezas-rec">0</span></div>
+                    </div>
+                </div>`;
+
+            const tbody = document.getElementById('tbody-reconstruct');
+            let lastRow = null;
+
+            t.celdas.forEach((c, idx) => {
+                if (idx % 4 === 0) {
+                    lastRow = document.createElement('tr');
+                    tbody.appendChild(lastRow);
+                }
+                lastRow.innerHTML += `
+                    <td style="background:#f2f2f2; text-align:center; font-weight:bold;">${c.id}</td>
+                    <td>
+                        <div class="cell-input-group">
+                            <input type="number" class="p-weight-rec" data-id="${c.id}" value="${c.peso}" oninput="recalcularTotalesReconstruidos()" data-owner="${c.owner}" data-status="${c.status}" data-desc="${c.desc}">
+                            <button class="btn-info-trigger" onclick="abrirVentanaFlotanteDetalles(this.previousElementSibling, '${c.id}')">ⓘ</button>
+                        </div>
+                    </td>`;
+            });
+            recalcularTotalesReconstruidos();
+        }
+
+        function recalcularTotalesReconstruidos() {
+            let inputs = document.querySelectorAll('.p-weight-rec');
+            let totalPeso = 0, cabezas = 0;
+            inputs.forEach(inp => {
+                let v = parseFloat(inp.value) || 0;
+                if(v > 0) cabezas++;
+                totalPeso += v;
+            });
+            document.getElementById('kpi-prom-rec').innerText = cabezas > 0 ? (totalPeso/cabezas).toFixed(2) : 0;
+            document.getElementById('kpi-peso-rec').innerText = totalPeso;
+            document.getElementById('kpi-cabezas-rec').innerText = cabezas;
+        }
+
+        function guardarCambiosTablaReconstruida(oldName) {
+            delete BASE_DATOS_VIRTUAL.tablasPesaje[oldName];
+            let nameT = document.getElementById('rec-name').value;
+            let dateT = document.getElementById('rec-date').value;
+            let celdas = [];
+            document.querySelectorAll('.p-weight-rec').forEach(inp => {
+                celdas.push({
+                    id: inp.getAttribute('data-id'), peso: inp.value, owner: inp.getAttribute('data-owner')||'', status: inp.getAttribute('data-status')||'Bueno', desc: inp.getAttribute('data-desc')||''
+                });
+            });
+            BASE_DATOS_VIRTUAL.tablasPesaje[nameT] = { nombre: nameT, fecha: dateT, celdas: celdas };
+            alert('¡Tabla modificada y actualizada en el archivo histórico!');
+            filtrarBusquedaAvanzadaMaster();
+            document.getElementById('espacioEdicionTablaReconstruida').innerHTML = '';
+        }
+
+        function filtrarBusquedaVacunaMaster() {
+            let fid = document.getElementById('s-vac-id').value.trim().toLowerCase();
+            let desde = document.getElementById('s-vac-date-start').value;
+            let hasta = document.getElementById('s-vac-date-end').value;
+
+            let res = BASE_DATOS_VIRTUAL.vacunaciones.filter(x => {
+                if (fid && !x.id.toLowerCase().includes(fid)) return false;
+                if (!evaluarRangoFecha(x.fecha, desde, hasta)) return false;
+                return true;
+            });
+
+            let html = `<table class="table-results"><thead><tr><th>ID Unidad</th><th>Propietario</th><th>¿Vacunado?</th><th>Fecha Aplicación</th><th>Operaciones</th></tr></thead><tbody>`;
+            res.forEach((x, index) => {
+                html += `<tr id="row-vac-${index}"><td><strong>${x.id}</strong></td><td><input type="text" id="ev-owner-${index}" value="${x.propietario}"></td><td><select id="ev-ind-${index}"><option value="Sí" ${x.indicador==='Sí'?'selected':''}>Sí</option><option value="No" ${x.indicador==='No'?'selected':''}>No</option></select></td><td><input type="date" id="ev-date-${index}" value="${x.fecha}"></td><td>
+                    <button class="btn-action-table" onclick="guardarEdicionVacunaDirecta(${index}, '${x.id}')">Guardar</button>
+                    <button class="btn-action-table btn-delete" onclick="eliminarVacunaDirecta(${index}, '${x.id}')">Eliminar</button>
+                </td></tr>`;
+            });
+            document.getElementById('resultBusquedaVacuna').innerHTML = html + "</tbody></table>";
+        }
+
+        function guardarEdicionVacunaDirecta(idx, id) {
+            let item = BASE_DATOS_VIRTUAL.vacunaciones.find(x => x.id === id);
+            if(item) {
+                item.propietario = document.getElementById(`ev-owner-${idx}`).value;
+                item.indicador = document.getElementById(`ev-ind-${idx}`).value;
+                item.fecha = document.getElementById(`ev-date-${idx}`).value;
+                alert('Registro clínico actualizado.');
+            }
+        }
+
+        function eliminarVacunaDirecta(idx, id) {
+            BASE_DATOS_VIRTUAL.vacunaciones = BASE_DATOS_VIRTUAL.vacunaciones.filter(x => x.id !== id);
+            document.getElementById(`row-vac-${idx}`).remove();
+        }
+
+        function buscarFichaRegistroCivilOrdeño() {
+            let fid = document.getElementById('s-ord-id-search').value.trim().toLowerCase();
+            let desde = document.getElementById('s-ord-date-start').value;
+            let hasta = document.getElementById('s-ord-date-end').value;
+
+            // Filtrado múltiple dinámico incluyendo rangos o fechas específicas
+            let listadoValidos = BASE_DATOS_VIRTUAL.ordeños.filter(x => {
+                if (fid && !x.id.toLowerCase().includes(fid)) return false;
+                if (!evaluarRangoFecha(x.fecha, desde, hasta)) return false;
+                return true;
+            });
+
+            if(listadoValidos.length === 0) {
+                document.getElementById('contenedorFichaRegistroCivil').innerHTML = '';
+                return alert('No se encontraron registros civiles coincidentes con los criterios.');
+            }
+
+            // Mostramos el primer registro encontrado
+            let a = listadoValidos[0];
+
+            document.getElementById('contenedorFichaRegistroCivil').innerHTML = `
+                <div class="documento-civil-oficial" id="doc-folio-print">
+                    <div class="doc-header-escudo">
+                        <h2>REGISTRO CIVIL DE CONTROL BOVINO</h2>
+                        <p>Hacienda Venecia - Trazabilidad y Gestión Oficial</p>
+                    </div>
+                    <div class="doc-grid-campos">
+                        <div class="doc-campo"><label>ID Unidad Nacional</label><input type="text" id="f-id" value="${a.id}" disabled></div>
+                        <div class="doc-campo"><label>Hierro / Marca de Fuego</label><input type="text" id="f-hierro" value="${a.hierro}"></div>
+                        <div class="doc-campo"><label>Nombre Registrado</label><input type="text" id="f-nombre" value="${a.nombre}"></div>
+                        <div class="doc-campo"><label>Sexo</label><input type="text" id="f-sexo" value="${a.sexo}"></div>
+                        <div class="doc-campo"><label>Lugar de Nacimiento</label><input type="text" id="f-lugarnac" value="${a.lugarnac}"></div>
+                        <div class="doc-campo"><label>Municipio / Departamento</label><input type="text" id="f-mun" value="${a.mun}"></div>
+                        <div class="doc-campo"><label>Nombre Madre Genética</label><input type="text" id="f-madre" value="${a.madre}"></div>
+                        <div class="doc-campo"><label>ID Madre</label><input type="text" id="f-idmadre" value="${a.idMadre}"></div>
+                        <div class="doc-campo"><label>Número de Partos</label><input type="number" id="f-partos" value="${a.partos}"></div>
+                        <div class="doc-campo"><label>Litros Producción Diaria</label><input type="number" step="0.1" id="f-litros" value="${a.litros}"></div>
+                        <div class="doc-campo"><label>Fecha Alta Registro</label><input type="date" id="f-fecha" value="${a.fecha}"></div>
+                        <div class="doc-campo"><label>Notas e Historial de Observación</label><input type="text" id="f-notes" value="${a.notas}"></div>
+                    </div>
+                    <div style="display:flex; gap:10px; margin-top:20px;">
+                        <button class="btn-top" style="background:var(--color-good);" onclick="guardarCambiosDocumentoCivil('${a.id}')">Guardar Documento</button>
+                        <button class="btn-top" style="background:var(--color-bad);" onclick="borrarDocumentoCivil('${a.id}')">Eliminar Folio</button>
+                    </div>
+                </div>`;
+        }
+
+        function guardarCambiosDocumentoCivil(id) {
+            let idx = BASE_DATOS_VIRTUAL.ordeños.findIndex(x => x.id === id);
+            if(idx !== -1) {
+                BASE_DATOS_VIRTUAL.ordeños[idx].hierro = document.getElementById('f-hierro').value;
+                BASE_DATOS_VIRTUAL.ordeños[idx].nombre = document.getElementById('f-nombre').value;
+                BASE_DATOS_VIRTUAL.ordeños[idx].lugarnac = document.getElementById('f-lugarnac').value;
+                BASE_DATOS_VIRTUAL.ordeños[idx].mun = document.getElementById('f-mun').value;
+                BASE_DATOS_VIRTUAL.ordeños[idx].madre = document.getElementById('f-madre').value;
+                BASE_DATOS_VIRTUAL.ordeños[idx].partos = document.getElementById('f-partos').value;
+                BASE_DATOS_VIRTUAL.ordeños[idx].litros = document.getElementById('f-litros').value;
+                BASE_DATOS_VIRTUAL.ordeños[idx].notas = document.getElementById('f-notes').value;
+                alert('El documento oficial del bovino ha sido modificado y archivado.');
+            }
+        }
+
+        function borrarDocumentoCivil(id) {
+            BASE_DATOS_VIRTUAL.ordeños = BASE_DATOS_VIRTUAL.ordeños.filter(x => x.id !== id);
+            document.getElementById('contenedorFichaRegistroCivil').innerHTML = '';
+            alert('Folio civil eliminado del sistema.');
+        }
+
+        function exportarTablaExcelDirecta(id, name) { const wb = XLSX.utils.table_to_book(document.getElementById(id)); XLSX.writeFile(wb, `${name}.xlsx`); }
+    </script>
+</body>
+</html>
