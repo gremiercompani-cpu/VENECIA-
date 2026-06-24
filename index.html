@@ -8,20 +8,21 @@
     <!-- Librería Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- Conectores oficiales de Firebase -->
+    <!-- Conectores oficiales de Firebase (Compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <!-- Inicialización del ecosistema de base de datos -->
     <script>
+        // Credenciales reales de tu app VENECIA (Proyecto GUARDADO)
         const firebaseConfig = {
-            apiKey: "AIzaSyDq1xLplHRKYjB7GqW40-jvVjAUcWub8gQ",
-            authDomain: "venecia-67ca0.firebaseapp.com",
-            projectId: "venecia-67ca0",
-            storageBucket: "venecia-67ca0.firebasestorage.app",
-            messagingSenderId: "602400151670",
-            appId: "1:602400151670:web:9045d45975ba56aa9f2757",
-            measurementId: "G-47L98HSTVG"
+            apiKey: "AIzaSyAh2a06f1qb3ua5E_13_Wb98LpM6k8pwGk",
+            authDomain: "guardado-8568e.firebaseapp.com",
+            projectId: "guardado-8568e",
+            storageBucket: "guardado-8568e.firebasestorage.app",
+            messagingSenderId: "211419024710",
+            appId: "1:211419024710:web:e136187a8376f854b62947",
+            measurementId: "G-174K13QMD1"
         };
 
         // Encendido de la conexión remota
@@ -345,7 +346,7 @@
             ordeños: [] 
         };
         
-        let numTablasCreadas = 0, numBlocksVacunacion = 0, listadoZonasAfectadas = [], celdaActivaEdicion = null;
+        let numTablasCreadas = 0, numBlocksVacunacion = 0, listadoZonasAfectadas = [], celdaActivaEdicion = null, metadataCeldasExcel = {};
 
         // Establecer fecha actual por defecto en el campo de ingreso de Unidad
         document.getElementById('unit-date').value = new Date().toISOString().split('T')[0];
@@ -380,8 +381,8 @@
             wrapper.innerHTML = `
                 <div class="excel-left-table">
                     <div style="background:#e2efda; padding:8px; border:1px solid var(--excel-border); font-weight:bold; font-size:12px; margin-bottom:5px; display:flex; gap:15px;">
-                        <span>TABLA: <input type="text" class="t-meta-name" value="Lote-${numTablasCreadas}" style="font-weight:bold; width:150px;"></span>
-                        <span>Fecha: <input type="date" class="t-meta-date" value="${today}"></span>
+                        <span>TABLA: <input type="text" class="t-meta-name" id="t-name-${numTablasCreadas}" value="Lote-${numTablasCreadas}" style="font-weight:bold; width:150px;"></span>
+                        <span>Fecha: <input type="date" class="t-meta-date" id="t-date-${numTablasCreadas}" value="${today}"></span>
                     </div>
                     <table class="table-excel-format" id="grid-valores-${numTablasCreadas}">
                         <thead><tr><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th><th>N°</th><th>Kg</th></tr></thead>
@@ -418,12 +419,15 @@
                 tbody.appendChild(lastRow);
             }
 
+            let cellWrapper = document.createElement('div');
+            cellWrapper.className = 'cell-input-group';
+            
             lastRow.innerHTML += `
                 <td style="background:#f2f2f2; text-align:center; font-weight:bold; width:5%;">${proximoId}</td>
                 <td style="width:20%;">
                     <div class="cell-input-group">
                         <input type="number" class="p-weight" data-id="${proximoId}" placeholder="0" oninput="recalcularTotalesExcel(${idxTabla})">
-                        <button class="btn-info-trigger" onclick="abrirVentanaFlotanteDetalles(this.previousElementSibling, '${proximoId}')">ⓘ</button>
+                        <button class="btn-info-trigger" onclick="abrirVentanaFlotanteDetalles(this.previousElementSibling, '${idxTabla}-${proximoId}')">ⓘ</button>
                     </div>
                 </td>`;
             reajustarEstructuraCeldasFantasma(lastRow);
@@ -442,6 +446,7 @@
 
         function recalcularTotalesExcel(idx) {
             const table = document.getElementById(`grid-valores-${idx}`);
+            if(!table) return;
             let inputs = table.querySelectorAll('.p-weight');
             let pesoTotalGeneral = 0, totalCabezas = 0;
             let colTotals = [0, 0, 0, 0];
@@ -461,196 +466,348 @@
             document.getElementById(`kpi-prom-${idx}`).innerText = promedioGeneral.toFixed(2);
             document.getElementById(`kpi-peso-${idx}`).innerText = pesoTotalGeneral;
             document.getElementById(`kpi-cabezas-${idx}`).innerText = totalCabezas;
+            
             let precioKg = parseFloat(document.getElementById(`kpi-input-precio-${idx}`).value) || 0;
-            document.getElementById(`kpi-total-cop-${idx}`).innerText = `$ ${(pesoTotalGeneral * precioKg).toLocaleString('es-CO')}`;
+            document.getElementById(`kpi-total-cop-${idx}`).innerText = "$ " + (pesoTotalGeneral * precioKg).toLocaleString('es-CO');
         }
 
-        function abrirVentanaFlotanteDetalles(inputEl, animalID) {
-            celdaActivaEdicion = inputEl;
-            document.getElementById('modalTitleID').innerText = `Detalle Unidad N°/ID: ${animalID}`;
-            document.getElementById('m-owner').value = inputEl.getAttribute('data-owner') || "";
-            document.getElementById('m-status').value = inputEl.getAttribute('data-status') || "Bueno";
-            document.getElementById('m-desc').value = inputEl.getAttribute('data-desc') || "";
+        // CONTROL VENTANAS FLOTANTES DE EXCEL (ⓘ)
+        function abrirVentanaFlotanteDetalles(inputEl, key) {
+            celdaActivaEdicion = key;
             document.getElementById('modalDetalleUnidad').style.display = 'flex';
+            let guardado = metadataCeldasExcel[key] || { owner: '', status: 'Bueno', desc: '' };
+            document.getElementById('m-owner').value = guardado.owner;
+            document.getElementById('m-status').value = guardado.status;
+            document.getElementById('m-desc').value = guardado.desc;
         }
 
-        function cerrarVentanaDetalles() { document.getElementById('modalDetalleUnidad').style.display = 'none'; }
-        
+        function cerrarVentanaDetalles() {
+            document.getElementById('modalDetalleUnidad').style.display = 'none';
+        }
+
         function guardarCambiosVentanaDetalles() {
             if(celdaActivaEdicion) {
-                celdaActivaEdicion.setAttribute('data-owner', document.getElementById('m-owner').value);
-                celdaActivaEdicion.setAttribute('data-status', document.getElementById('m-status').value);
-                celdaActivaEdicion.setAttribute('data-desc', document.getElementById('m-desc').value);
+                metadataCeldasExcel[celdaActivaEdicion] = {
+                    owner: document.getElementById('m-owner').value,
+                    status: document.getElementById('m-status').value,
+                    desc: document.getElementById('m-desc').value
+                };
             }
             cerrarVentanaDetalles();
         }
 
-        function agregarFilaAOrdenio() {
-            const tbody = document.getElementById('tbodyOrdenioRows');
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><input type="text" class="ord-id" placeholder="ID"></td>
-                <td><input type="text" class="ord-hierro" placeholder="Hierro"></td>
-                <td><input type="text" class="ord-nombre" placeholder="Nombre"></td>
-                <td><select class="ord-sexo"><option value="H">Hembra</option><option value="M">Macho</option></select></td>
-                <td><input type="text" class="ord-lugar" placeholder="Lugar"></td>
-                <td><input type="text" class="ord-correg" placeholder="Correg."></td>
-                <td><input type="text" class="ord-muni" placeholder="Muni."></td>
-                <td><input type="text" class="ord-estado" placeholder="Estado"></td>
-                <td><input type="text" class="ord-madre" placeholder="Madre"></td>
-                <td><input type="text" class="ord-madre-id" placeholder="ID M."></td>
-                <td><input type="text" class="ord-madre-num" placeholder="N° M."></td>
-                <td><input type="number" class="ord-partos" placeholder="0"></td>
-                <td><input type="text" class="ord-padre-t" placeholder="Padre"></td>
-                <td><input type="number" class="ord-terneros" placeholder="0"></td>
-                <td><input type="text" class="ord-padre-num" placeholder="N° P."></td>
-                <td><input type="text" class="ord-procedencia" placeholder="Proc."></td>
-                <td><input type="date" class="ord-fecha"></td>
-                <td><input type="number" class="ord-litros" placeholder="0"></td>
-                <td><input type="text" class="ord-notas" placeholder="Notas"></td>`;
-            tbody.appendChild(tr);
-        }
-
+        // DINÁMICA DE VACUNACIÓN
         function crearNuevaTablaVacunacionBlock() {
             numBlocksVacunacion++;
             const container = document.getElementById('contenedorVacunacionMultiBlocks');
-            const div = document.createElement('div');
-            div.style.border = "1px solid var(--border-color)";
-            div.style.padding = "15px";
-            div.style.marginBottom = "15px";
+            let div = document.createElement('div');
+            div.style.marginBottom = "20px";
             div.innerHTML = `
-                <div style="margin-bottom: 10px;">
-                    <strong>Campamento / Lote Vacunas N° ${numBlocksVacunacion}</strong>
+                <div style="background:#cbd5e1; padding:8px; border:1px solid #94a3b8; font-weight:bold; font-size:12px;">
+                    LOTE / VACUNA CONTROL N° ${numBlocksVacunacion}
                 </div>
                 <table class="table-excel-format" id="tabla-vacuna-${numBlocksVacunacion}">
-                    <thead>
-                        <tr><th>ID Animal</th><th>Vacuna / Medicamento</th><th>Dosis</th><th>Veterinario</th><th>Fecha</th></tr>
-                    </thead>
+                    <thead><tr><th>ID Unidad</th><th>Tipo Vacuna / Fármaco</th><th>Dosis (ml/cc)</th><th>Responsable Clínico</th><th>Fecha Diagnóstico</th></tr></thead>
                     <tbody>
                         <tr>
-                            <td><input type="text" class="vac-id" placeholder="Ej. Bov-01"></td>
-                            <td><input type="text" class="vac-name" placeholder="Aftosa / Brucelosis"></td>
-                            <td><input type="text" class="vac-dosis" placeholder="5 ml"></td>
-                            <td><input type="text" class="vac-vet" placeholder="Nombre Dr."></td>
-                            <td><input type="date" class="vac-date"></td>
+                            <td><input type="text" class="v-id" placeholder="Ej. Bov-01"></td>
+                            <td><input type="text" class="v-type" placeholder="Aftosa / Brucelosis"></td>
+                            <td><input type="text" class="v-dose" placeholder="Ej. 2ml"></td>
+                            <td><input type="text" class="v-doc" placeholder="Médico Veterinario"></td>
+                            <td><input type="date" class="v-date" value="${new Date().toISOString().split('T')[0]}"></td>
                         </tr>
                     </tbody>
                 </table>`;
             container.appendChild(div);
         }
 
+        // DINÁMICA DE ORDEÑO
+        function agregarFilaAOrdenio() {
+            const tbody = document.getElementById('tbodyOrdenioRows');
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="o-id" placeholder="ID"></td><td><input type="text" class="o-hierro" placeholder="Hierro"></td>
+                <td><input type="text" class="o-name" placeholder="Nombre"></td><td><input type="text" class="o-sex" placeholder="M/F"></td>
+                <td><input type="text" class="o-place" placeholder="Lugar"></td><td><input type="text" class="o-correg" placeholder="Corregimiento"></td>
+                <td><input type="text" class="o-muni" placeholder="Municipio"></td><td><input type="text" class="o-status" placeholder="Estado"></td>
+                <td><input type="text" class="o-mother" placeholder="Madre"></td><td><input type="text" class="o-m-id" placeholder="ID M."></td>
+                <td><input type="text" class="o-m-num" placeholder="N° M."></td><td><input type="number" class="o-partos" placeholder="0"></td>
+                <td><input type="text" class="o-padre-t" placeholder="Padre T."></td><td><input type="number" class="o-terneros" placeholder="0"></td>
+                <td><input type="text" class="o-p-num" placeholder="N° P."></td><td><input type="text" class="o-proc" placeholder="Procedencia"></td>
+                <td><input type="date" class="o-date" value="${new Date().toISOString().split('T')[0]}"></td><td><input type="number" class="o-litros" placeholder="0"></td>
+                <td><input type="text" class="o-notes" placeholder="Notas"></td>`;
+            tbody.appendChild(tr);
+        }
+
+        // EXPORTADOR EXCEL DIRECTO
         function exportarTablaExcelDirecta(tableId, filename) {
-            const table = document.getElementById(tableId);
-            const wb = XLSX.utils.table_to_book(table, {sheet: "Datos"});
+            let table = document.getElementById(tableId);
+            let wb = XLSX.utils.table_to_book(table, { sheet: "DataMaster" });
             XLSX.writeFile(wb, `${filename}.xlsx`);
         }
 
         // ==========================================
-        // CAPA DE PERSISTENCIA Y SINCRONIZACIÓN FIREBASE
+        // SISTEMA CORE DE SINCRONIZACIÓN CON FIREBASE
         // ==========================================
-        
-        function sincronizarYGuardarTodo() {
-            // Recolectar datos de Unidades Individuales
-            let unidadNum = document.getElementById('unit-num').value;
-            if(unidadNum) {
-                let infoUnidad = {
-                    id: unidadNum,
-                    nombre: document.getElementById('unit-name').value,
-                    propietario: document.getElementById('unit-owner').value,
-                    ica: document.getElementById('unit-ica').value,
-                    patologia: document.getElementById('unit-disease').value,
-                    fecha: document.getElementById('unit-date').value,
-                    zonasAfectadas: document.getElementById('unit-obs-lugar').value,
-                    observaciones: document.getElementById('unit-obs-general').value
-                };
-                BASE_DATOS_VIRTUAL.unidades.push(infoUnidad);
-            }
 
-            // Recolectar datos de Ordeño
-            BASE_DATOS_VIRTUAL.ordeños = [];
-            document.querySelectorAll('#tbodyOrdenioRows tr').forEach(row => {
-                let idBovino = row.querySelector('.ord-id').value;
-                if(idBovino) {
-                    BASE_DATOS_VIRTUAL.ordeños.push({
-                        id: idBovino,
-                        hierro: row.querySelector('.ord-hierro').value,
-                        nombre: row.querySelector('.ord-nombre').value,
-                        sexo: row.querySelector('.ord-sexo').value,
-                        lugar: row.querySelector('.ord-lugar').value,
-                        fecha: row.querySelector('.ord-fecha').value,
-                        litros: row.querySelector('.ord-litros').value
+        async function sincronizarYGuardarTodo() {
+            try {
+                // 1. Guardar datos de la Unidad Principal si tiene ID cargado
+                let unitId = document.getElementById('unit-num').value.trim();
+                if (unitId) {
+                    let unidadDoc = {
+                        id: unitId,
+                        nombre: document.getElementById('unit-name').value,
+                        propietario: document.getElementById('unit-owner').value,
+                        ica: document.getElementById('unit-ica').value,
+                        patologia: document.getElementById('unit-disease').value,
+                        fecha: document.getElementById('unit-date').value,
+                        zonasAfectadas: listadoZonasAfectadas,
+                        observacionGeneral: document.getElementById('unit-obs-general').value
+                    };
+                    await db.collection("unidades").doc(unitId).set(unidadDoc);
+                }
+
+                // 2. Guardar Tablas de Pesaje Dinámicas
+                for (let i = 1; i <= numTablasCreadas; i++) {
+                    let tableEl = document.getElementById(`grid-valores-${i}`);
+                    if (!tableEl) continue;
+                    let tableName = document.getElementById(`t-name-${i}`).value;
+                    let tableDate = document.getElementById(`t-date-${i}`).value;
+                    let weights = [];
+                    tableEl.querySelectorAll('.p-weight').forEach(input => {
+                        let idCell = input.getAttribute('data-id');
+                        weights.push({
+                            idCell: idCell,
+                            valor: parseFloat(input.value) || 0,
+                            meta: metadataCeldasExcel[`${i}-${idCell}`] || null
+                        });
+                    });
+
+                    await db.collection("pesajes").doc(`lote-${i}`).set({
+                        nombreTabla: tableName,
+                        fecha: tableDate,
+                        pesos: weights,
+                        precioKg: parseFloat(document.getElementById(`kpi-input-precio-${i}`).value) || 0
                     });
                 }
-            });
 
-            // Enviar a la nube Firebase Firestore
-            db.collection("consolas").doc("venecia_master").set({
-                datosCompletos: JSON.stringify(BASE_DATOS_VIRTUAL),
-                ultimaActualizacion: firebase.firestore.FieldValue.serverTimestamp()
-            })
-            .then(() => {
-                alert("¡Sincronización Exitosa! Datos resguardados en la nube de VENECIA.");
-            })
-            .catch((error) => {
-                console.error("Error al sincronizar: ", error);
-                alert("Error crítico de red al guardar.");
-            });
-        }
-
-        function buscarTablasDesdeNube() {
-            db.collection("consolas").doc("venecia_master").get().then((doc) => {
-                if (doc.exists) {
-                    let res = doc.data();
-                    if(res.datosCompletos) {
-                        BASE_DATOS_VIRTUAL = JSON.parse(res.datosCompletos);
-                        alert("Datos descargados de la nube correctamente. Base de datos virtual actualizada.");
-                        reconstruirTablasDesdeBaseVirtual();
+                // 3. Guardar Bloques de Vacunación
+                for (let i = 1; i <= numBlocksVacunacion; i++) {
+                    let vt = document.getElementById(`tabla-vacuna-${i}`);
+                    if (!vt) continue;
+                    let vacDoc = {
+                        unidadId: vt.querySelector('.v-id').value,
+                        tipo: vt.querySelector('.v-type').value,
+                        dosis: vt.querySelector('.v-dose').value,
+                        responsable: vt.querySelector('.v-doc').value,
+                        fecha: vt.querySelector('.v-date').value
+                    };
+                    if(vacDoc.unidadId) {
+                        await db.collection("vacunaciones").add(vacDoc);
                     }
-                } else {
-                    alert("No se encontró ninguna base de datos guardada en la nube.");
                 }
-            }).catch((error) => {
-                console.error("Error al descargar: ", error);
-            });
-        }
 
-        function reconstruirTablasDesdeBaseVirtual() {
-            // Reconstruir Matriz de Ordeño si tiene filas guardadas
-            if(BASE_DATOS_VIRTUAL.ordeños && BASE_DATOS_VIRTUAL.ordeños.length > 0) {
-                const tbody = document.getElementById('tbodyOrdenioRows');
-                tbody.innerHTML = "";
-                BASE_DATOS_VIRTUAL.ordeños.forEach(ord => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><input type="text" class="ord-id" value="${ord.id}"></td>
-                        <td><input type="text" class="ord-hierro" value="${ord.hierro}"></td>
-                        <td><input type="text" class="ord-nombre" value="${ord.nombre}"></td>
-                        <td><select class="ord-sexo"><option value="H" ${ord.sexo==='H'?'selected':''}>Hembra</option><option value="M" ${ord.sexo==='M'?'selected':''}>Macho</option></select></td>
-                        <td><input type="text" class="ord-lugar" value="${ord.lugar}"></td>
-                        <td><input type="text" class="ord-correg" placeholder="Correg."></td>
-                        <td><input type="text" class="ord-muni" placeholder="Muni."></td>
-                        <td><input type="text" class="ord-estado" placeholder="Estado"></td>
-                        <td><input type="text" class="ord-madre" placeholder="Madre"></td>
-                        <td><input type="text" class="ord-madre-id" placeholder="ID M."></td>
-                        <td><input type="text" class="ord-madre-num" placeholder="N° M."></td>
-                        <td><input type="number" class="ord-partos" placeholder="0"></td>
-                        <td><input type="text" class="ord-padre-t" placeholder="Padre"></td>
-                        <td><input type="number" class="ord-terneros" placeholder="0"></td>
-                        <td><input type="text" class="ord-padre-num" placeholder="N° P."></td>
-                        <td><input type="text" class="ord-procedencia" placeholder="Proc."></td>
-                        <td><input type="date" class="ord-fecha" value="${ord.fecha}"></td>
-                        <td><input type="number" class="ord-litros" value="${ord.litros}"></td>
-                        <td><input type="text" class="ord-notas" placeholder="Notas"></td>`;
-                    tbody.appendChild(tr);
-                });
+                // 4. Guardar Datos de Ordeño
+                let rowsOrdeño = document.querySelectorAll('#tbodyOrdenioRows tr');
+                for (let row of rowsOrdeño) {
+                    let oId = row.querySelector('.o-id').value.trim();
+                    if(oId) {
+                        let ordeñoDoc = {
+                            id: oId,
+                            hierro: row.querySelector('.o-hierro').value,
+                            nombre: row.querySelector('.o-name').value,
+                            sexo: row.querySelector('.o-sex').value,
+                            lugar: row.querySelector('.o-place').value,
+                            corregimiento: row.querySelector('.o-correg').value,
+                            municipio: row.querySelector('.o-muni').value,
+                            estado: row.querySelector('.o-status').value,
+                            madre: row.querySelector('.o-mother').value,
+                            madreId: row.querySelector('.o-m-id').value,
+                            madreNum: row.querySelector('.o-m-num').value,
+                            partos: parseInt(row.querySelector('.o-partos').value) || 0,
+                            padreTernero: row.querySelector('.o-padre-t').value,
+                            terneros: parseInt(row.querySelector('.o-terneros').value) || 0,
+                            padreNum: row.querySelector('.o-p-num').value,
+                            procedencia: row.querySelector('.o-proc').value,
+                            fecha: row.querySelector('.o-date').value,
+                            litros: parseFloat(row.querySelector('.o-litros').value) || 0,
+                            notas: row.querySelector('.o-notes').value
+                        };
+                        await db.collection("ordenios").doc(oId).set(ordeñoDoc);
+                    }
+                }
+
+                alert("¡Sincronización Exitosa! Toda la información ha sido guardada en la Nube de VENECIA.");
+            } catch (error) {
+                console.error("Error al sincronizar: ", error);
+                alert("Error al conectar con la base de datos.");
             }
         }
 
-        // Funciones de búsqueda base vacías para evitar errores de ejecución inicial
-        function filtrarBusquedaUnidadMaster() { alert("Consultando datos de unidades locales/nube..."); }
-        function filtrarBusquedaAvanzadaMaster() { alert("Buscando registros operativos históricos..."); }
-        function filtrarBusquedaVacunaMaster() { alert("Abriendo historial de control clínico..."); }
-        function buscarFichaRegistroCivilOrdeño() { alert("Generando documento civil bovino oficial..."); }
+        async function buscarTablasDesdeNube() {
+            alert("Descargando última información de la base de datos central...");
+            // Descargar unidades en memoria caché local
+            BASE_DATOS_VIRTUAL.unidades = [];
+            let snapUni = await db.collection("unidades").get();
+            snapUni.forEach(doc => BASE_DATOS_VIRTUAL.unidades.push(doc.data()));
+
+            // Descargar vacunaciones
+            BASE_DATOS_VIRTUAL.vacunaciones = [];
+            let snapVac = await db.collection("vacunaciones").get();
+            snapVac.forEach(doc => BASE_DATOS_VIRTUAL.vacunaciones.push(doc.data()));
+
+            // Descargar Ordeños
+            BASE_DATOS_VIRTUAL.ordeños = [];
+            let snapOrd = await db.collection("ordenios").get();
+            snapOrd.forEach(doc => BASE_DATOS_VIRTUAL.ordeños.push(doc.data()));
+
+            alert("Ecosistema local actualizado. Listo para consultas avanzadas.");
+        }
+
+        // ==========================================
+        // FILTROS Y MÉTODOS DE BÚSQUEDA AVANZADA
+        // ==========================================
+
+        function filtrarBusquedaUnidadMaster() {
+            let sId = document.getElementById('s-uni-id').value.toLowerCase().trim();
+            let sName = document.getElementById('s-uni-name').value.toLowerCase().trim();
+            let dStart = document.getElementById('s-uni-date-start').value;
+            let dEnd = document.getElementById('s-uni-date-end').value;
+
+            let filtrados = BASE_DATOS_VIRTUAL.unidades.filter(u => {
+                let matchId = sId ? u.id.toLowerCase().includes(sId) : true;
+                let matchName = sName ? u.nombre.toLowerCase().includes(sName) : true;
+                let matchDate = true;
+                if (dStart) matchDate = matchDate && (u.fecha >= dStart);
+                if (dEnd) matchDate = matchDate && (u.fecha <= dEnd);
+                return matchId && matchName && matchDate;
+            });
+
+            let html = `<table class="table-results"><thead><tr><th>ID</th><th>Nombre</th><th>Propietario</th><th>Fecha</th></tr></thead><tbody>`;
+            filtrados.forEach(u => {
+                html += `<tr class="row-clicable" onclick="mostrarFichaDetalleUnidad('${u.id}')"><td>${u.id}</td><td>${u.nombre}</td><td>${u.propietario}</td><td>${u.fecha}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            document.getElementById('resultBusquedaUnidad').innerHTML = html;
+        }
+
+        function mostrarFichaDetalleUnidad(id) {
+            let u = BASE_DATOS_VIRTUAL.unidades.find(item => item.id === id);
+            if (!u) return;
+            let panel = document.getElementById('fichaDetalleUnidadCompleta');
+            panel.style.display = 'block';
+            panel.innerHTML = `
+                <div style="border:1px solid var(--accent-corporate); padding:15px; background:#fff;">
+                    <h3>FICHA TÉCNICA: ${u.nombre}</h3><br>
+                    <p><strong>ID:</strong> ${u.id}</p>
+                    <p><strong>Propietario:</strong> ${u.propietario}</p>
+                    <p><strong>Registro ICA:</strong> ${u.ica}</p>
+                    <p><strong>Patologías:</strong> ${u.patologia}</p>
+                    <p><strong>Zonas Lesiones:</strong> ${u.zonasAfectadas.join(', ') || 'Ninguna'}</p>
+                    <p><strong>Notas Extra:</strong> ${u.observacionGeneral}</p>
+                </div>`;
+        }
+
+        async function filtrarBusquedaAvanzadaMaster() {
+            let sName = document.getElementById('s-rep-tablename').value.toLowerCase().trim();
+            let dStart = document.getElementById('s-rep-date-start').value;
+            let dEnd = document.getElementById('s-rep-date-end').value;
+
+            let snap = await db.collection("pesajes").get();
+            let html = `<table class="table-results"><thead><tr><th>Lote / Tabla</th><th>Fecha Registro</th><th>Acción</th></tr></thead><tbody>`;
+            
+            snap.forEach(doc => {
+                let data = doc.data();
+                let matchName = sName ? data.nombreTabla.toLowerCase().includes(sName) : true;
+                let matchDate = true;
+                if (dStart) matchDate = matchDate && (data.fecha >= dStart);
+                if (dEnd) matchDate = matchDate && (data.fecha <= dEnd);
+
+                if (matchName && matchDate) {
+                    html += `<tr><td>${data.nombreTabla}</td><td>${data.fecha}</td><td><button class="btn-action-table" onclick="reconstruirYEditarTabla('${doc.id}')">Ver Estructura</button></td></tr>`;
+                }
+            });
+            html += `</tbody></table>`;
+            document.getElementById('resultBusquedaReparticion').innerHTML = html;
+        }
+
+        async function reconstruirYEditarTabla(docId) {
+            let doc = await db.collection("pesajes").doc(docId).get();
+            if(!doc.exists) return;
+            let data = doc.data();
+            let panel = document.getElementById('espacioEdicionTablaReconstruida');
+            
+            let html = `<div style="border:1px solid var(--excel-border); padding:15px; background:#fff;">
+                <h4>Visualización de Tabla Histórica: ${data.nombreTabla} (${data.fecha})</h4><br>
+                <table class="table-excel-format"><thead><tr><th>Celda</th><th>Peso Cargado</th><th>Historial Notas</th></tr></thead><tbody>`;
+            data.pesos.forEach(p => {
+                html += `<tr><td>N° ${p.idCell}</td><td>${p.valor} kg</td><td>Owner: ${p.meta ? p.meta.owner : 'N/A'} | Obs: ${p.meta ? p.meta.desc : 'N/A'}</td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+            panel.innerHTML = html;
+        }
+
+        function filtrarBusquedaVacunaMaster() {
+            let sId = document.getElementById('s-vac-id').value.toLowerCase().trim();
+            let dStart = document.getElementById('s-vac-date-start').value;
+            let dEnd = document.getElementById('s-vac-date-end').value;
+
+            let filtrados = BASE_DATOS_VIRTUAL.vacunaciones.filter(v => {
+                let matchId = sId ? v.unidadId.toLowerCase().includes(sId) : true;
+                let matchDate = true;
+                if (dStart) matchDate = matchDate && (v.fecha >= dStart);
+                if (dEnd) matchDate = matchDate && (v.fecha <= dEnd);
+                return matchId && matchDate;
+            });
+
+            let html = `<table class="table-results"><thead><tr><th>ID Animal</th><th>Vacuna</th><th>Dosis</th><th>Veterinario</th><th>Fecha</th></tr></thead><tbody>`;
+            filtrados.forEach(v => {
+                html += `<tr><td>${v.unidadId}</td><td>${v.tipo}</td><td>${v.dosis}</td><td>${v.responsable}</td><td>${v.fecha}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            document.getElementById('resultBusquedaVacuna').innerHTML = html;
+        }
+
+        function buscarFichaRegistroCivilOrdeño() {
+            let sId = document.getElementById('s-ord-id-search').value.toLowerCase().trim();
+            let dStart = document.getElementById('s-ord-date-start').value;
+            let dEnd = document.getElementById('s-ord-date-end').value;
+
+            let filtrados = BASE_DATOS_VIRTUAL.ordeños.filter(o => {
+                let matchId = sId ? o.id.toLowerCase().includes(sId) : true;
+                let matchDate = true;
+                if (dStart) matchDate = matchDate && (o.fecha >= dStart);
+                if (dEnd) matchDate = matchDate && (o.fecha <= dEnd);
+                return matchId && matchDate;
+            });
+
+            let container = document.getElementById('contenedorFichaRegistroCivil');
+            container.innerHTML = '';
+
+            filtrados.forEach(o => {
+                let div = document.createElement('div');
+                div.className = 'documento-civil-oficial';
+                div.innerHTML = `
+                    <div class="doc-header-escudo">
+                        <h2>REGISTRO CIVIL DE IDENTIFICACIÓN BOVINA</h2>
+                        <p>CONSOLA DE CONTROL SUPREMA - FINCA VENECIA</p>
+                    </div>
+                    <div class="doc-grid-campos">
+                        <div class="doc-campo"><label>ID Único</label><input type="text" value="${o.id}" readonly></div>
+                        <div class="doc-campo"><label>Hierro de Marca</label><input type="text" value="${o.hierro}" readonly></div>
+                        <div class="doc-campo"><label>Nombre del Animal</label><input type="text" value="${o.nombre}" readonly></div>
+                        <div class="doc-campo"><label>Sexo</label><input type="text" value="${o.sexo}" readonly></div>
+                        <div class="doc-campo"><label>Municipio Natal</label><input type="text" value="${o.municipio}" readonly></div>
+                        <div class="doc-campo"><label>Estado Físico</label><input type="text" value="${o.estado}" readonly></div>
+                        <div class="doc-campo"><label>Producción Diaria</label><input type="text" value="${o.litros} Litros" readonly></div>
+                        <div class="doc-campo"><label>Fecha Alta</label><input type="text" value="${o.fecha}" readonly></div>
+                        <div class="doc-campo"><label>Notas del Registro</label><input type="text" value="${o.notes}" readonly></div>
+                    </div>`;
+                container.appendChild(div);
+            });
+            if(filtrados.length === 0) container.innerHTML = '<p>No se encontraron Fichas Civiles con los filtros ingresados.</p>';
+        }
     </script>
 </body>
 </html>
