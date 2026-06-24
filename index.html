@@ -25,9 +25,14 @@
             measurementId: "G-174K13QMD1"
         };
 
-        // Encendido de la conexión remota
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        // Encendido de la conexión remota con captura de errores de inicio
+        try {
+            firebase.initializeApp(firebaseConfig);
+            var db = firebase.firestore();
+            console.log("Firebase inicializado correctamente.");
+        } catch (e) {
+            alert("Error crítico al inicializar Firebase: " + e.message);
+        }
     </script>
 
     <style>
@@ -338,7 +343,7 @@
     </div>
 
     <script>
-        // ECO-SISTEMA CENTRAL DE BASES DE DATOS VIRTUALES CON PERSISTENCIA INTEGRAL
+        // ECO-SISTEMA CENTRAL DE BASES DE DATOS VIRTUALES
         let BASE_DATOS_VIRTUAL = { 
             unidades: [], 
             tablasPesaje: {}, 
@@ -348,7 +353,7 @@
         
         let numTablasCreadas = 0, numBlocksVacunacion = 0, listadoZonasAfectadas = [], celdaActivaEdicion = null, metadataCeldasExcel = {};
 
-        // Establecer fecha actual por defecto en el campo de ingreso de Unidad
+        // Cargar fecha de hoy por defecto
         document.getElementById('unit-date').value = new Date().toISOString().split('T')[0];
 
         function toggleSidebar() { document.getElementById('sidebarMenu').classList.toggle('open'); }
@@ -369,7 +374,6 @@
             document.getElementById('unit-obs-lugar').value = listadoZonasAfectadas.join(', ');
         }
 
-        // GENERADORES DINAMICOS DE LA TABLA OPERATIVA EXCEL
         function crearNuevaTablaSegunFormato() {
             numTablasCreadas++;
             const container = document.getElementById('contenedorDinamicoTablasExcel');
@@ -419,17 +423,20 @@
                 tbody.appendChild(lastRow);
             }
 
-            let cellWrapper = document.createElement('div');
-            cellWrapper.className = 'cell-input-group';
+            let tdNum = document.createElement('td');
+            tdNum.style.cssText = "background:#f2f2f2; text-align:center; font-weight:bold; width:5%;";
+            tdNum.innerText = proximoId;
+
+            let tdInput = document.createElement('td');
+            tdInput.style.width = "20%";
+            tdInput.innerHTML = `
+                <div class="cell-input-group">
+                    <input type="number" class="p-weight" data-id="${proximoId}" placeholder="0" oninput="recalcularTotalesExcel(${idxTabla})">
+                    <button class="btn-info-trigger" onclick="abrirVentanaFlotanteDetalles(this.previousElementSibling, '${idxTabla}-${proximoId}')">ⓘ</button>
+                </div>`;
             
-            lastRow.innerHTML += `
-                <td style="background:#f2f2f2; text-align:center; font-weight:bold; width:5%;">${proximoId}</td>
-                <td style="width:20%;">
-                    <div class="cell-input-group">
-                        <input type="number" class="p-weight" data-id="${proximoId}" placeholder="0" oninput="recalcularTotalesExcel(${idxTabla})">
-                        <button class="btn-info-trigger" onclick="abrirVentanaFlotanteDetalles(this.previousElementSibling, '${idxTabla}-${proximoId}')">ⓘ</button>
-                    </div>
-                </td>`;
+            lastRow.appendChild(tdNum);
+            lastRow.appendChild(tdInput);
             reajustarEstructuraCeldasFantasma(lastRow);
         }
 
@@ -439,7 +446,10 @@
             if (cantInputs > 0 && cantInputs < 4) {
                 let faltantes = 4 - cantInputs;
                 for(let i=0; i<faltantes; i++) {
-                    row.innerHTML += `<td class="ghost-cell" style="background:#fafafa;">-</td><td class="ghost-cell" style="background:#fafafa;"></td>`;
+                    let tdG1 = document.createElement('td'); tdG1.className = 'ghost-cell'; tdG1.style.background = '#fafafa'; tdG1.innerText = '-';
+                    let tdG2 = document.createElement('td'); tdG2.className = 'ghost-cell'; tdG2.style.background = '#fafafa';
+                    row.appendChild(tdG1);
+                    row.appendChild(tdG2);
                 }
             }
         }
@@ -459,7 +469,8 @@
             });
 
             for(let i=0; i<4; i++) {
-                if(document.getElementById(`tot-col${i+1}-${idx}`)) document.getElementById(`tot-col${i+1}-${idx}`).innerText = colTotals[i];
+                let targetCol = document.getElementById(`tot-col${i+1}-${idx}`);
+                if(targetCol) targetCol.innerText = colTotals[i];
             }
 
             let promedioGeneral = totalCabezas > 0 ? (pesoTotalGeneral / totalCabezas) : 0;
@@ -471,7 +482,6 @@
             document.getElementById(`kpi-total-cop-${idx}`).innerText = "$ " + (pesoTotalGeneral * precioKg).toLocaleString('es-CO');
         }
 
-        // CONTROL VENTANAS FLOTANTES DE EXCEL (ⓘ)
         function abrirVentanaFlotanteDetalles(inputEl, key) {
             celdaActivaEdicion = key;
             document.getElementById('modalDetalleUnidad').style.display = 'flex';
@@ -481,9 +491,7 @@
             document.getElementById('m-desc').value = guardado.desc;
         }
 
-        function cerrarVentanaDetalles() {
-            document.getElementById('modalDetalleUnidad').style.display = 'none';
-        }
+        function cerrarVentanaDetalles() { document.getElementById('modalDetalleUnidad').style.display = 'none'; }
 
         function guardarCambiosVentanaDetalles() {
             if(celdaActivaEdicion) {
@@ -496,7 +504,6 @@
             cerrarVentanaDetalles();
         }
 
-        // DINÁMICA DE VACUNACIÓN
         function crearNuevaTablaVacunacionBlock() {
             numBlocksVacunacion++;
             const container = document.getElementById('contenedorVacunacionMultiBlocks');
@@ -521,7 +528,6 @@
             container.appendChild(div);
         }
 
-        // DINÁMICA DE ORDEÑO
         function agregarFilaAOrdenio() {
             const tbody = document.getElementById('tbodyOrdenioRows');
             let tr = document.createElement('tr');
@@ -539,7 +545,6 @@
             tbody.appendChild(tr);
         }
 
-        // EXPORTADOR EXCEL DIRECTO
         function exportarTablaExcelDirecta(tableId, filename) {
             let table = document.getElementById(tableId);
             let wb = XLSX.utils.table_to_book(table, { sheet: "DataMaster" });
@@ -551,8 +556,15 @@
         // ==========================================
 
         async function sincronizarYGuardarTodo() {
+            if (typeof db === 'undefined') {
+                alert("La base de datos no está disponible. Revisa la consola o tu conexión de red.");
+                return;
+            }
+            
+            let guardadoExitoso = false;
+
             try {
-                // 1. Guardar datos de la Unidad Principal si tiene ID cargado
+                // 1. Guardar datos de la Unidad Principal
                 let unitId = document.getElementById('unit-num').value.trim();
                 if (unitId) {
                     let unidadDoc = {
@@ -566,6 +578,7 @@
                         observacionGeneral: document.getElementById('unit-obs-general').value
                     };
                     await db.collection("unidades").doc(unitId).set(unidadDoc);
+                    guardadoExitoso = true;
                 }
 
                 // 2. Guardar Tablas de Pesaje Dinámicas
@@ -590,6 +603,7 @@
                         pesos: weights,
                         precioKg: parseFloat(document.getElementById(`kpi-input-precio-${i}`).value) || 0
                     });
+                    guardadoExitoso = true;
                 }
 
                 // 3. Guardar Bloques de Vacunación
@@ -605,6 +619,7 @@
                     };
                     if(vacDoc.unidadId) {
                         await db.collection("vacunaciones").add(vacDoc);
+                        guardadoExitoso = true;
                     }
                 }
 
@@ -635,38 +650,49 @@
                             notas: row.querySelector('.o-notes').value
                         };
                         await db.collection("ordenios").doc(oId).set(ordeñoDoc);
+                        guardadoExitoso = true;
                     }
                 }
 
-                alert("¡Sincronización Exitosa! Toda la información ha sido guardada en la Nube de VENECIA.");
+                if (guardadoExitoso) {
+                    alert("¡Sincronización Exitosa! Toda la información ha sido guardada en la Nube de VENECIA.");
+                } else {
+                    alert("No hay datos rellenados o válidos para guardar en este momento. Escribe un ID de Unidad o agrega un Pesaje.");
+                }
+
             } catch (error) {
-                console.error("Error al sincronizar: ", error);
-                alert("Error al conectar con la base de datos.");
+                console.error("Error completo de Firebase: ", error);
+                // Si sale un error de permisos o reglas caducadas, saldrá aquí reflejado en pantalla
+                alert("Firebase rechazó la operación.\nDetalle del error: " + error.message + "\n\nTip: Verifica si las reglas de Firestore están en modo público (allow read, write: if true;)");
             }
         }
 
         async function buscarTablasDesdeNube() {
-            alert("Descargando última información de la base de datos central...");
-            // Descargar unidades en memoria caché local
-            BASE_DATOS_VIRTUAL.unidades = [];
-            let snapUni = await db.collection("unidades").get();
-            snapUni.forEach(doc => BASE_DATOS_VIRTUAL.unidades.push(doc.data()));
+            if (typeof db === 'undefined') {
+                alert("La base de datos no está lista.");
+                return;
+            }
+            try {
+                BASE_DATOS_VIRTUAL.unidades = [];
+                let snapUni = await db.collection("unidades").get();
+                snapUni.forEach(doc => BASE_DATOS_VIRTUAL.unidades.push(doc.data()));
 
-            // Descargar vacunaciones
-            BASE_DATOS_VIRTUAL.vacunaciones = [];
-            let snapVac = await db.collection("vacunaciones").get();
-            snapVac.forEach(doc => BASE_DATOS_VIRTUAL.vacunaciones.push(doc.data()));
+                BASE_DATOS_VIRTUAL.vacunaciones = [];
+                let snapVac = await db.collection("vacunaciones").get();
+                snapVac.forEach(doc => BASE_DATOS_VIRTUAL.vacunaciones.push(doc.data()));
 
-            // Descargar Ordeños
-            BASE_DATOS_VIRTUAL.ordeños = [];
-            let snapOrd = await db.collection("ordenios").get();
-            snapOrd.forEach(doc => BASE_DATOS_VIRTUAL.ordeños.push(doc.data()));
+                BASE_DATOS_VIRTUAL.ordeños = [];
+                let snapOrd = await db.collection("ordenios").get();
+                snapOrd.forEach(doc => BASE_DATOS_VIRTUAL.ordeños.push(doc.data()));
 
-            alert("Ecosistema local actualizado. Listo para consultas avanzadas.");
+                alert("Ecosistema local actualizado. Registros en memoria listos para consultas avanzadas.");
+            } catch (error) {
+                alert("Error al descargar datos: " + error.message);
+            }
         }
 
         // ==========================================
-        // FILTROS Y MÉTODOS DE BÚSQUEDA AVANZADA
+        // FILTROS Y MÉTODOS DE BÚSQUEDA
         // ==========================================
 
         function filtrarBusquedaUnidadMaster() {
@@ -710,26 +736,31 @@
         }
 
         async function filtrarBusquedaAvanzadaMaster() {
+            if (typeof db === 'undefined') return;
             let sName = document.getElementById('s-rep-tablename').value.toLowerCase().trim();
             let dStart = document.getElementById('s-rep-date-start').value;
             let dEnd = document.getElementById('s-rep-date-end').value;
 
-            let snap = await db.collection("pesajes").get();
-            let html = `<table class="table-results"><thead><tr><th>Lote / Tabla</th><th>Fecha Registro</th><th>Acción</th></tr></thead><tbody>`;
-            
-            snap.forEach(doc => {
-                let data = doc.data();
-                let matchName = sName ? data.nombreTabla.toLowerCase().includes(sName) : true;
-                let matchDate = true;
-                if (dStart) matchDate = matchDate && (data.fecha >= dStart);
-                if (dEnd) matchDate = matchDate && (data.fecha <= dEnd);
+            try {
+                let snap = await db.collection("pesajes").get();
+                let html = `<table class="table-results"><thead><tr><th>Lote / Tabla</th><th>Fecha Registro</th><th>Acción</th></tr></thead><tbody>`;
+                
+                snap.forEach(doc => {
+                    let data = doc.data();
+                    let matchName = sName ? data.nombreTabla.toLowerCase().includes(sName) : true;
+                    let matchDate = true;
+                    if (dStart) matchDate = matchDate && (data.fecha >= dStart);
+                    if (dEnd) matchDate = matchDate && (data.fecha <= dEnd);
 
-                if (matchName && matchDate) {
-                    html += `<tr><td>${data.nombreTabla}</td><td>${data.fecha}</td><td><button class="btn-action-table" onclick="reconstruirYEditarTabla('${doc.id}')">Ver Estructura</button></td></tr>`;
-                }
-            });
-            html += `</tbody></table>`;
-            document.getElementById('resultBusquedaReparticion').innerHTML = html;
+                    if (matchName && matchDate) {
+                        html += `<tr><td>${data.nombreTabla}</td><td>${data.fecha}</td><td><button class="btn-action-table" onclick="reconstruirYEditarTabla('${doc.id}')">Ver Estructura</button></td></tr>`;
+                    }
+                });
+                html += `</tbody></table>`;
+                document.getElementById('resultBusquedaReparticion').innerHTML = html;
+            } catch (e) {
+                alert("Error en consulta de pesajes: " + e.message);
+            }
         }
 
         async function reconstruirYEditarTabla(docId) {
